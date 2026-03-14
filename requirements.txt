@@ -1,5 +1,9 @@
 # The Matrix - Multi-Agent System
 # Python依赖
 
+fastapi>=0.104.0
+uvicorn>=0.24.0
+jinja2>=3.1.0
+
 pyyaml>=6.0
 requests>=2.28.0
