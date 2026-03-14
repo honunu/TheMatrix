@@ -299,11 +299,11 @@ async def chat(message: dict):
     state.add_log("info", f"对话: {content[:30]}...", "User")
     
     # 广播开始
-    asyncio.run(manager.broadcast({
+    await manager.broadcast({
         "type": "agent_start",
         "agent": "Morpheus",
         "message": "正在理解用户意图..."
-    }))
+    })
     
     try:
         # 初始化 matrix 如果需要
@@ -320,11 +320,11 @@ async def chat(message: dict):
         
         for agent_name, status_msg in stages:
             state.update_agent_status(agent_name, "processing", content)
-            asyncio.run(manager.broadcast({
+            await manager.broadcast({
                 "type": "agent_stage",
                 "agent": agent_name,
                 "message": status_msg
-            }))
+            })
             await asyncio.sleep(0.1)  # 短暂延迟让前端更新
         
         # 直接运行任务
@@ -340,10 +340,10 @@ async def chat(message: dict):
         state.add_log("info", f"对话完成", "Morpheus")
         
         # 广播完成
-        asyncio.run(manager.broadcast({
+        await manager.broadcast({
             "type": "agent_done",
             "message": "处理完成"
-        }))
+        })
         
         # 保存 AI 回复
         save_message("assistant", result)
