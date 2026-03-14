@@ -298,14 +298,34 @@ async def chat(message: dict):
     save_message("user", content)
     state.add_log("info", f"对话: {content[:30]}...", "User")
     
+    # 广播开始
+    asyncio.run(manager.broadcast({
+        "type": "agent_start",
+        "agent": "Morpheus",
+        "message": "正在理解用户意图..."
+    }))
+    
     try:
         # 初始化 matrix 如果需要
         if state.matrix_instance is None:
             init_matrix()
         
-        # 更新状态 - 通知所有 Agent 正在处理
-        for name in ["Morpheus", "Architect", "Neo", "Oracle"]:
-            state.update_agent_status(name, "processing", content)
+        # 分阶段更新状态并广播
+        stages = [
+            ("Morpheus", "正在分析用户意图..."),
+            ("Architect", "正在分解任务..."),
+            ("Neo", "正在处理..."),
+            ("Oracle", "正在评估结果..."),
+        ]
+        
+        for agent_name, status_msg in stages:
+            state.update_agent_status(agent_name, "processing", content)
+            asyncio.run(manager.broadcast({
+                "type": "agent_stage",
+                "agent": agent_name,
+                "message": status_msg
+            }))
+            await asyncio.sleep(0.1)  # 短暂延迟让前端更新
         
         # 直接运行任务
         raw_result = state.matrix_instance.run(content)
@@ -314,10 +334,16 @@ async def chat(message: dict):
         result = extract_final_answer(raw_result)
         
         # 更新状态为空闲
-        for name in ["Morpheus", "Architect", "Neo", "Oracle"]:
+        for name in ["Morpheus", "Architect", "Neo", "Oracle", "Trinity", "Cypher"]:
             state.update_agent_status(name, "idle")
         
         state.add_log("info", f"对话完成", "Morpheus")
+        
+        # 广播完成
+        asyncio.run(manager.broadcast({
+            "type": "agent_done",
+            "message": "处理完成"
+        }))
         
         # 保存 AI 回复
         save_message("assistant", result)
@@ -349,10 +375,30 @@ async def get_logs(limit: int = 100):
 
 @app.get("/api/status")
 async def get_status():
-    """获取系统状态"""
+    """获取系统状态 - 精简版"""
+    # 只返回必要的 Agent 信息
+    agents_info = {}
+    for name, agent in state.agents.items():
+        agents_info[name] = {
+            "name": agent.get("name", name),
+            "status": agent.get("status", "idle"),
+            "current_task": agent.get("current_task", "")[:50] if agent.get("current_task") else "",
+            "last_update": agent.get("last_update", "")
+        }
+    
+    # 只返回必要的任务信息
+    tasks_info = []
+    for task in state.tasks[:10]:
+        tasks_info.append({
+            "id": task.get("id", ""),
+            "content": task.get("content", "")[:80],
+            "status": task.get("status", ""),
+            "created_at": task.get("created_at", "")
+        })
+    
     return {
-        "agents": state.agents,
-        "tasks": state.tasks[:10],
+        "agents": agents_info,
+        "tasks": tasks_info,
         "active_tasks": len([t for t in state.tasks if t["status"] == "running"]),
         "total_tasks": len(state.tasks)
     }

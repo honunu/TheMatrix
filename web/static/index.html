@@ -940,6 +940,16 @@
                             tasks.value = data.tasks || [];
                         } else if (data.type === 'task_update') {
                             loadStatus();
+                        } else if (data.type === 'agent_stage' || data.type === 'agent_start') {
+                            // 对话中显示 Agent 阶段信息
+                            if (isChatting.value && activeTab.value === 'chat') {
+                                const idx = chatMessages.value.findIndex(m => m.content === '...');
+                                if (idx !== -1) {
+                                    chatMessages.value[idx].content = `[${data.agent}] ${data.message}`;
+                                }
+                            }
+                        } else if (data.type === 'agent_done') {
+                            // 处理完成，不需要额外操作
                         }
                     };
                     ws.onerror = () => setTimeout(initWebSocket, 5000);
