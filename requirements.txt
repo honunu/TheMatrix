@@ -1,0 +1,5 @@
+# The Matrix - Multi-Agent System
+# Python依赖
+
+pyyaml>=6.0
+requests>=2.28.0

@@ -1,0 +1,37 @@
+llm:
+  provider: "qwen"  # qwen, openai, anthropic
+  api_key: "YOUR_API_KEY_HERE"
+  base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+  model: "qwen-plus"
+
+  # 模型配置
+  temperature: 0.7
+  max_tokens: 4096
+
+memory:
+  enabled: true
+  type: "memory"
+  max_history: 100
+
+agents:
+  architect:
+    name: "Architect"
+    description: "系统架构师，负责任务分解与资源分配"
+  morpheus:
+    name: "Morpheus"
+    description: "导航者，负责理解用户意图并制定策略"
+  oracle:
+    name: "Oracle"
+    description: "先知，负责风险评估与趋势预测"
+  neo:
+    name: "Neo"
+    description: "救世主，负责复杂问题决策与创新突破"
+  trinity:
+    name: "Trinity"
+    description: "执行者，负责高效执行任务"
+  smith:
+    name: "Smith"
+    description: "防御者，负责异常检测与安全审计"
+  cypher:
+    name: "Cypher"
+    description: "记忆管理者，负责共享上下文"
