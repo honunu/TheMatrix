@@ -551,6 +551,19 @@
                     }
                 };
                 
+                const loadChatHistory = async () => {
+                    try {
+                        const res = await axios.get('/api/chat/history');
+                        chatMessages.value = res.data.map((m, i) => ({
+                            id: i,
+                            role: m.role,
+                            content: m.content
+                        }));
+                    } catch (e) {
+                        console.error(e);
+                    }
+                };
+                
                 const submitTask = async () => {
                     if (!newTask.value.trim() || isRunning.value) return;
                     isRunning.value = true;
@@ -635,6 +648,7 @@
                     loadStatus();
                     loadLogs();
                     loadConfig();
+                    loadChatHistory();
                     initWebSocket();
                     
                     // 定时刷新

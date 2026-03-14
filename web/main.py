@@ -3,6 +3,7 @@ import sys
 import json
 import asyncio
 import threading
+import sqlite3
 from pathlib import Path
 from datetime import datetime
 from typing import Optional
@@ -99,6 +100,73 @@ class MatrixState:
         self.config = new_config
 
 state = MatrixState()
+
+# 数据库初始化
+DB_PATH = Path(__file__).parent / "chat_history.db"
+
+def init_db():
+    """初始化数据库"""
+    conn = sqlite3.connect(str(DB_PATH))
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS chat_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            role TEXT NOT NULL,
+            content TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+def save_message(role: str, content: str):
+    """保存对话消息"""
+    conn = sqlite3.connect(str(DB_PATH))
+    conn.execute(
+        "INSERT INTO chat_history (role, content, created_at) VALUES (?, ?, ?)",
+        (role, content, datetime.now().isoformat())
+    )
+    conn.commit()
+    conn.close()
+
+def get_history(limit: int = 100):
+    """获取对话历史"""
+    conn = sqlite3.connect(str(DB_PATH))
+    cursor = conn.execute(
+        "SELECT role, content, created_at FROM chat_history ORDER BY id DESC LIMIT ?",
+        (limit,)
+    )
+    rows = cursor.fetchall()
+    conn.close()
+    return [{"role": r[0], "content": r[1], "created_at": r[2]} for r in rows]
+
+def clear_history():
+    """清空对话历史"""
+    conn = sqlite3.connect(str(DB_PATH))
+    conn.execute("DELETE FROM chat_history")
+    conn.commit()
+    conn.close()
+
+def extract_final_answer(text: str) -> str:
+    """从完整输出中提取关键结果"""
+    if not text:
+        return ""
+    
+    lines = text.strip().split('\n')
+    
+    # 移除空行
+    lines = [l.strip() for l in lines if l.strip()]
+    
+    if not lines:
+        return ""
+    
+    # 如果输出很长，只取最后 500 字
+    if len(text) > 500:
+        return text[-500:]
+    
+    return text
+
+# 初始化数据库
+init_db()
 
 # WebSocket 连接管理
 class ConnectionManager:
@@ -226,6 +294,8 @@ async def chat(message: dict):
     if not content:
         return {"error": "内容不能为空"}
     
+    # 保存用户消息
+    save_message("user", content)
     state.add_log("info", f"对话: {content[:30]}...", "User")
     
     try:
@@ -233,21 +303,44 @@ async def chat(message: dict):
         if state.matrix_instance is None:
             init_matrix()
         
-        # 更新状态
-        state.update_agent_status("Morpheus", "processing", content)
+        # 更新状态 - 通知所有 Agent 正在处理
+        for name in ["Morpheus", "Architect", "Neo", "Oracle"]:
+            state.update_agent_status(name, "processing", content)
         
         # 直接运行任务
-        result = state.matrix_instance.run(content)
+        raw_result = state.matrix_instance.run(content)
         
-        state.update_agent_status("Morpheus", "idle")
+        # 提取关键结果 - 只返回最后的总结部分
+        result = extract_final_answer(raw_result)
+        
+        # 更新状态为空闲
+        for name in ["Morpheus", "Architect", "Neo", "Oracle"]:
+            state.update_agent_status(name, "idle")
+        
         state.add_log("info", f"对话完成", "Morpheus")
+        
+        # 保存 AI 回复
+        save_message("assistant", result)
         
         return {"content": result}
     
     except Exception as e:
-        state.update_agent_status("Morpheus", "idle")
+        for name in ["Morpheus", "Architect", "Neo", "Oracle"]:
+            state.update_agent_status(name, "idle")
         state.add_log("error", f"对话失败: {str(e)}")
         return {"error": str(e)}
+
+@app.get("/api/chat/history")
+async def get_chat_history(limit: int = 100):
+    """获取对话历史"""
+    history = get_history(limit)
+    return list(reversed(history))  # 按时间正序
+
+@app.delete("/api/chat/history")
+async def clear_chat_history():
+    """清空对话历史"""
+    clear_history()
+    return {"status": "ok"}
 
 @app.get("/api/logs")
 async def get_logs(limit: int = 100):
