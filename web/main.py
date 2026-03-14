@@ -129,8 +129,8 @@ def init_matrix():
         state.matrix_instance = TheMatrix()
         state.add_log("info", "TheMatrix 系统已启动")
         
-        # 初始化 Agent 状态
-        for name in ["Architect", "Morpheus", "Oracle", "Neo", "Trinity", "Smith", "Cypher"]:
+        # 初始化 Agent 状态 (暂不使用 Smith)
+        for name in ["Architect", "Morpheus", "Oracle", "Neo", "Trinity", "Cypher"]:
             state.update_agent_status(name, "idle")
         
         return True
@@ -218,6 +218,36 @@ async def create_task(task: dict):
     thread.start()
     
     return {"task_id": task_id, "status": "running"}
+
+@app.post("/api/chat")
+async def chat(message: dict):
+    """对话接口 - 直接与 AI 对话"""
+    content = message.get("content", "")
+    if not content:
+        return {"error": "内容不能为空"}
+    
+    state.add_log("info", f"对话: {content[:30]}...", "User")
+    
+    try:
+        # 初始化 matrix 如果需要
+        if state.matrix_instance is None:
+            init_matrix()
+        
+        # 更新状态
+        state.update_agent_status("Morpheus", "processing", content)
+        
+        # 直接运行任务
+        result = state.matrix_instance.run(content)
+        
+        state.update_agent_status("Morpheus", "idle")
+        state.add_log("info", f"对话完成", "Morpheus")
+        
+        return {"content": result}
+    
+    except Exception as e:
+        state.update_agent_status("Morpheus", "idle")
+        state.add_log("error", f"对话失败: {str(e)}")
+        return {"error": str(e)}
 
 @app.get("/api/logs")
 async def get_logs(limit: int = 100):
